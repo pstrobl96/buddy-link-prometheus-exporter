@@ -4,11 +4,13 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/pstrobl96/prusa_exporter/config"
+	"github.com/pstrobl96/prusa_exporter/measurements"
 	"github.com/pstrobl96/prusa_exporter/prusalink"
 	"github.com/pstrobl96/prusa_exporter/syslog"
 	"github.com/rs/zerolog"
@@ -20,6 +22,7 @@ var (
 	metricsPath = kingpin.Flag("exporter.metrics-path", "Path where to expose metrics.").Default("/metrics").String()
 	metricsPort = kingpin.Flag("exporter.metrics-port", "Port where to expose metrics.").Default("10009").Int()
 	syslogTTL   = kingpin.Flag("syslog.ttl", "TTL for syslog metrics in seconds.").Default("60").Int()
+	measurement = kingpin.Flag("measurement", "Measurement to be executed").Default("false").Bool()
 )
 
 // Run function to start the exporter
@@ -39,8 +42,30 @@ func Run() {
 	if err != nil {
 		logLevel = zerolog.InfoLevel // default log level
 	}
+
 	zerolog.SetGlobalLevel(logLevel)
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixNano
+
+	if *measurement {
+		log.Info().Msg("Starting measurement")
+
+		for i := 0; i < 3; i++ {
+
+			log.Debug().Msg("Logs")
+			// logs
+			for i := 0; i < 3; i++ {
+				measurements.Measure(config.Exporter.Syslog.Logs.ListenAddress, time.Second*60)
+			}
+
+			log.Debug().Msg("Metrics")
+			// metrics
+			for i := 0; i < 5; i++ {
+				measurements.Measure(config.Exporter.Syslog.Metrics.ListenAddress, time.Second*10)
+			}
+		}
+
+		return
+	}
 
 	config, err = probeConfigFile(config)
 
