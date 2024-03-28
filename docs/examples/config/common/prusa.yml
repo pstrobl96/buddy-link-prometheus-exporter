@@ -2,10 +2,10 @@ exporter:
   scrape_timeout: 1000 # scrape timeout of Prusa Link in ms
   log_level: info
   prusalink:
-    enabled: true
+    enabled: false
   syslog:
     metrics:
-      enabled: true
+      enabled: false
       listen_address: 0.0.0.0:10008
     logs:
       enabled: true

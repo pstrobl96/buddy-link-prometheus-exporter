@@ -1,18 +1,6 @@
 server:
   log_level: info
 
-metrics:
-  global:
-    scrape_interval: 15s
-    remote_write:
-    - url: http://mimir:9009/api/v1/push
-  configs:
-  - name: default
-    scrape_configs:
-    - job_name: "prusa"
-      static_configs:
-        - targets: ["exporter:10009"]
-
 logs:
   positions_directory: /var/lib/grafana-agent
   configs:
@@ -113,9 +101,3 @@ logs:
           stream: 'stdout'
           job: prusa_printers_logs
           __path__: /var/log/prusa/exporter.log
-
-integrations:
-  agent:
-    enabled: true
-  node_exporter:
-    enabled: true

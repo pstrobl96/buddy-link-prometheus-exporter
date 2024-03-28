@@ -1,0 +1,63 @@
+version: "3"
+
+volumes:
+  mimir_data:
+  grafana_data:
+  prusa_syslog_logs:
+
+services:
+  exporter:
+    image: pubeldev/prusa_exporter:v1.0.rc1
+    container_name: exporter
+    restart: unless-stopped
+    volumes:
+      - prusa_syslog_logs:/var/log/prusa
+      - type: bind
+        source: ./prusa.yml
+        target: /app/prusa.yml
+    ports:
+      - "10007:10007/udp"
+      - "10008:10008/udp"
+      - "10009:10009"
+    command: '--config.file=/app/prusa.yml'
+    networks:
+      - prusa
+
+  agent:
+    image: grafana/agent:v0.40.3
+    container_name: agent
+    depends_on:
+      - exporter
+      - mimir
+    restart: unless-stopped
+    volumes:  
+      - /var/run/docker.sock:/var/run/docker.sock
+      - prusa_syslog_logs:/var/log/prusa
+      - type: bind
+        source: ./docs/examples/config/on_premise/agent.yaml
+        target: /etc/agent-config/agent.yaml
+    entrypoint:
+      - /bin/grafana-agent
+      - -server.http.address=0.0.0.0:12345
+      - -config.file=/etc/agent-config/agent.yaml
+      - -metrics.wal-directory=/tmp/agent/wal
+    networks:
+      - prusa
+
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      - GF_INSTALL_PLUGINS=grafana-xyzchart-panel, grafana-polystat-panel
+    depends_on:
+      - loki
+      - mimir
+    ports:
+      - "3000:3000"
+    networks:
+      - prusa
+    volumes:
+      - ./docs/examples/config/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+      - ./docs/examples/grafana/provisioning:/var/lib/grafana/dashboards
