@@ -18,40 +18,22 @@ services:
     networks:
       - prusa
 
-  exporter:
-    image: pubeldev/prusa_exporter:v1.0.rc1
-    container_name: exporter
-    restart: unless-stopped
-    volumes:
-      - prusa_syslog_logs:/var/log/prusa
-      - type: bind
-        source: ./docs/examples/config/common/prusa.yml
-        target: /app/prusa.yml
-    ports:
-      - "10007:10007/udp"
-      - "10008:10008/udp"
-      - "10009:10009"
-    command: '--config.file=/app/prusa.yml'
-    networks:
-      - prusa
-
   agent:
     image: grafana/agent:v0.40.3
     container_name: agent
-    depends_on:
-      - exporter
     restart: unless-stopped
+    ports:
+      - "10007:10007/udp"
     volumes:  
-      - /var/run/docker.sock:/var/run/docker.sock
-      - prusa_syslog_logs:/var/log/prusa
       - type: bind
-        source: ./docs/examples/config/on_premise/agent.yaml
-        target: /etc/agent-config/agent.yaml
+        source: ./docs/examples/config/on_premise/agent.river
+        target: /etc/agent-config/agent.river
+    environment:
+      - AGENT_MODE=flow
     entrypoint:
       - /bin/grafana-agent
-      - -server.http.address=0.0.0.0:12345
-      - -config.file=/etc/agent-config/agent.yaml
-      - -metrics.wal-directory=/tmp/agent/wal
+      - run
+      - /etc/agent-config/agent.river
     networks:
       - prusa
 

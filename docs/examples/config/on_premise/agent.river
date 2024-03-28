@@ -1,0 +1,41 @@
+discovery.relabel "logs_prusa_syslog" {
+	targets = []
+
+	rule {
+		source_labels = ["__syslog_message_hostname"]
+		target_label  = "mac_address"
+	}
+
+	rule {
+		source_labels = ["__syslog_message_app_name"]
+		target_label  = "app"
+	}
+
+	rule {
+		source_labels = ["__syslog_connection_ip_address"]
+		target_label  = "ip"
+	}
+}
+
+loki.source.syslog "logs_prusa_syslog" {
+	listener {
+		address               = "0.0.0.0:10007"
+		protocol              = "udp"
+		idle_timeout          = "120ns"
+		label_structured_data = true
+		labels                = {
+			board = "buddy",
+			job   = "syslog-buddy",
+		}
+		max_message_length = 0
+	}
+	forward_to    = [loki.write.logs_prusa.receiver]
+	relabel_rules = discovery.relabel.logs_prusa_syslog.rules
+}
+
+loki.write "logs_prusa" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+	external_labels = {}
+}

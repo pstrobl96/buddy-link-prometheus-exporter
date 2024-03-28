@@ -8,96 +8,20 @@ logs:
     clients:
     - url: http://loki:3100/loki/api/v1/push
     scrape_configs:
-    - job_name: docker
-      pipeline_stages:
-        - match:
-            selector: '{container="exporter"}'
-            pipeline_name: prusa_syslog
-            stages:
-            - json:
-                expressions:
-                  message:
-                  stream:
-                  time:
-                  level:
-            - labels:
-                stream:
-                time:
-                level:
-            - output:
-                source: message
-            - timestamp:
-                source: time
-                format: UnixNs
-        - match:
-            selector: '{container!="exporter"}'
-            stages:
-              - logfmt:
-                  mapping:
-                    level:
-                    ts:
-              - labels:
-                  level:
-              - timestamp:
-                  source: ts
-                  format: RFC3339Nano
-      docker_sd_configs:
-        - host: unix:///var/run/docker.sock
-          refresh_interval: 5s
+    - job_name: syslog
+      syslog:
+        listen_address: 0.0.0.0:10007
+        listen_protocol: udp
+        idle_timeout: 120
+        label_structured_data: true
+        use_incoming_timestamp: false
+        labels:
+          job: "syslog-buddy"
+          board: "buddy"
       relabel_configs:
-        - source_labels: ['__meta_docker_container_name']
-          regex: '/(.*)'
-          target_label: 'container'
-        - source_labels: ['__meta_docker_container_log_stream']
-          target_label: 'logstream'
-        - source_labels: ['__meta_docker_container_label_logging_jobname']
-          target_label: 'job'
-    - job_name: system
-      pipeline_stages:
-      static_configs:
-      - labels:
-          job: varlogs
-          __path__: /var/log/*.log 
-    - job_name: prusa_syslog
-      pipeline_stages:
-        - json:
-            expressions:
-              message:
-              stream: 
-              time:   
-              level: 
-              app_name: 
-              client: 
-              hostname: 
-              priority:
-              proc_id:
-              msg_id:
-              severity:
-              facility:
-              structured_data:
-              tls_peer:
-              version:
-        - labels:
-            stream:
-            level: 
-            app_name: 
-            client: 
-            hostname: 
-            priority:
-            proc_id:
-            msg_id:
-            severity:
-            facility:
-            structured_data:
-            tls_peer:
-            version:
-        - output:
-            source: message
-        - timestamp:
-            source: time
-            format: UnixNs
-      static_configs:
-      - labels:
-          stream: 'stdout'
-          job: prusa_printers_logs
-          __path__: /var/log/prusa/exporter.log
+        - source_labels: ['__syslog_message_hostname']
+          target_label: 'mac_address'
+        - source_labels: ['__syslog_message_app_name']
+          target_label: 'app'
+        - source_labels: ['__syslog_connection_ip_address']
+          target_label: 'ip'
