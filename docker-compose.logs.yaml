@@ -1,11 +1,23 @@
 version: "3"
 
+networks:
+  prusa:
+
 volumes:
-  mimir_data:
   grafana_data:
   prusa_syslog_logs:
 
 services:
+  loki:
+    image: grafana/loki:2.9.6
+    container_name: loki
+    restart: unless-stopped
+    volumes:
+      - ./docs/examples/config/on_premise/loki.yaml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - prusa
+
   exporter:
     image: pubeldev/prusa_exporter:v1.0.rc1
     container_name: exporter
@@ -13,7 +25,7 @@ services:
     volumes:
       - prusa_syslog_logs:/var/log/prusa
       - type: bind
-        source: ./prusa.yml
+        source: ./docs/examples/config/common/prusa.yml
         target: /app/prusa.yml
     ports:
       - "10007:10007/udp"
@@ -28,7 +40,6 @@ services:
     container_name: agent
     depends_on:
       - exporter
-      - mimir
     restart: unless-stopped
     volumes:  
       - /var/run/docker.sock:/var/run/docker.sock
@@ -52,7 +63,6 @@ services:
       - GF_INSTALL_PLUGINS=grafana-xyzchart-panel, grafana-polystat-panel
     depends_on:
       - loki
-      - mimir
     ports:
       - "3000:3000"
     networks:
