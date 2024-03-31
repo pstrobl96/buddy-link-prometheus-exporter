@@ -199,7 +199,7 @@ func HandleMetrics(listenUDP string) {
 					points, _ := models.ParsePointsString(strings.Join(line, " "))
 
 					fmt.Printf("tags: %v\n", points[0].Tags())
-					client := promwrite.NewClient("http://mimir:9009/api/v1/write")
+					client := promwrite.NewClient("http://mimir:9009/api/v1/push")
 
 					fields, err := points[0].Fields()
 
@@ -227,7 +227,7 @@ func HandleMetrics(listenUDP string) {
 								{
 									Labels: labels,
 									Sample: promwrite.Sample{
-										Time:  time.Unix(timestampUnix-(timestamp*1000), 0),
+										Time:  time.Unix(timestampUnix-(timestamp), 0),
 										Value: 123,
 									},
 								},

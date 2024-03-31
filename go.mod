@@ -4,8 +4,9 @@ go 1.21
 
 require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/armon/go-metrics v0.3.10
+	github.com/castai/promwrite v0.5.0
 	github.com/icholy/digest v0.1.22
+	github.com/influxdata/influxdb v1.11.5
 	github.com/prometheus/client_golang v1.18.0
 	github.com/rs/zerolog v1.32.0
 	gopkg.in/mcuadros/go-syslog.v2 v2.3.0
@@ -16,16 +17,10 @@ require (
 require (
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/castai/promwrite v0.5.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/hashicorp/go-immutable-radix v1.3.0 // indirect
-	github.com/hashicorp/go-uuid v1.0.1 // indirect
-	github.com/hashicorp/golang-lru v0.5.4 // indirect
-	github.com/influxdata/influxdb v1.11.5 // indirect
-	github.com/influxdata/line-protocol/v2 v2.2.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
