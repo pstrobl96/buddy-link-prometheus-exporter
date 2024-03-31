@@ -15,6 +15,7 @@ type Config struct {
 		RemoteWrite   struct {
 			Enabled  bool   `yaml:"enabled"`
 			Endpoint string `yaml:"endpoint"`
+			Format   string `yaml:"format"`
 		} `yaml:"remote_write"`
 		Prusalink struct {
 			Enabled bool `yaml:"enabled"`

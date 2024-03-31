@@ -58,5 +58,6 @@ ruler_storage:
     directory: /tmp/mimir/rules
 
 limits:
+  out_of_order_time_window: 5m
   ingestion_burst_size: 500000
   ingestion_rate: 250000

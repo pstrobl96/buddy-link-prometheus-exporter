@@ -3,7 +3,9 @@ exporter:
   log_level: info
   remote_write:
     enabled: true
-    endpoint: http://mimir:9009/api/v1/push
+    format: influx # can be also influx
+    endpoint: http://influxproxy:8007/api/v1/push/influx/write
+    #endpoint: http://mimir:9009/api/v1/push
   prusalink:
     enabled: true
   syslog:

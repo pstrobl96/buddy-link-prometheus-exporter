@@ -11,7 +11,9 @@ import (
 )
 
 var (
-	ttl = 60
+	ttl                 = 60
+	remoteWriteFormat   string
+	remoteWriteEndpoint string
 )
 
 // Collect is a function that collects all the metrics

@@ -12,6 +12,9 @@ metrics:
     - job_name: "prusa"
       static_configs:
         - targets: ["exporter:10009"]
+    - job_name: "mimir"
+      static_configs:
+        - targets: ["mimir:9009"]
 
 logs:
   positions_directory: /var/lib/grafana-agent

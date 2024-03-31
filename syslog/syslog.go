@@ -1,7 +1,10 @@
 package syslog
 
 import (
+	"fmt"
+	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -78,38 +81,52 @@ func startSyslogServer(listenUDP string) (syslog.LogPartsChannel, *syslog.Server
 
 // HandleMetrics is function that listens for syslog messages and parses them into map
 func HandleMetrics(listenUDP string) {
+	debug := true
 	channel, server := startSyslogServer(listenUDP)
 	log.Debug().Msg("Syslog server started at: " + listenUDP)
 	go func(channel syslog.LogPartsChannel) {
 		for logParts := range channel {
-			mac := logParts["hostname"].(string)
-			if mac == "" { // Skip empty mac addresses
-				continue
-			} else {
-				mutex.Lock()
-				loadedPart := syslogMetrics[mac]
-
-				if loadedPart == nil {
-					loadedPart = make(map[string]map[string]string) // if found but empty, create a new map, at start it will be empty everytime
+			var timestamp time.Time
+			var output []string
+			if debug {
+				output = []string{}
+				timestamp = time.Now().UTC()
+				timestampUnix := timestamp.UnixNano()
+				mac := logParts["hostname"].(string)
+				if mac == "" {
+					continue
 				}
-
-				if loadedPart["ip"] == nil {
-					loadedPart["ip"] = make(map[string]string)
+				ip := logParts["client"].(string)
+				facility := logParts["facility"].(int)
+				severity := logParts["severity"].(int)
+				appName := logParts["app_name"].(string)
+				if appName == "" {
+					appName = "unknown"
 				}
-
-				if loadedPart["timestamp"] == nil {
-					loadedPart["timestamp"] = make(map[string]string)
+				procID := logParts["proc_id"].(string)
+				if procID == "" {
+					procID = "unknown"
 				}
-
-				loadedPart["ip"]["value"] = logParts["client"].(string)
-				loadedPart["timestamp"]["value"] = time.Now().Format(time.RFC3339Nano)
-
-				log.Trace().Msg("Received message from: " + mac)
-
+				msgID := logParts["msg_id"].(string)
+				if msgID == "" {
+					msgID = "unknown"
+				}
 				message := logParts["message"].(string)
+				if message == "" {
+					message = "unknown"
+				}
+				priority := logParts["priority"].(int)
+				structuredData := logParts["structured_data"].(string)
+				if structuredData == "" {
+					structuredData = "unknown"
+				}
+				version := logParts["version"].(int)
+				tlsPeer := logParts["tls_peer"].(string)
+				if tlsPeer == "" {
+					tlsPeer = "unknown"
+				}
 
 				var splittedMessage []string
-
 				if strings.Contains(message, "\n") {
 					splittedMessage = strings.Split(logParts["message"].(string), "\n")
 				} else {
@@ -117,50 +134,126 @@ func HandleMetrics(listenUDP string) {
 				}
 
 				for _, message := range splittedMessage {
-					for name, pattern := range regexpPatterns {
+					line := strings.Split(message, " ")
+					length := len(line)
+					pos := 0
+					if strings.Contains(line[pos], "msg") { // getting rid of msg metrics
+						line[0] = ""
+						pos = 1
+					}
 
-						reg, err := regexp.Compile(pattern.pattern)
-						if err != nil {
-							log.Error().Msg("Error compiling regexp: " + err.Error())
-							continue
-						}
+					line[pos] = strings.Join([]string{"prusa_" + line[0], "ip=" + ip, "facility=" + strconv.Itoa(facility), "severity=" + strconv.Itoa(severity),
+						"app_name=" + appName, "proc_id=" + procID, "msg_id=" + msgID, "priority=" + strconv.Itoa(priority), "structured_data=" + structuredData,
+						"version=" + strconv.Itoa(version), "tls_peer=" + tlsPeer, "mac=" + mac}, ",")
+					time, _ := strconv.ParseInt(line[length-1], 10, 64)
+					line[length-1] = strconv.FormatInt(timestampUnix-(time*1000), 10)
+					output = append(output, strings.Join(line, " "))
+					//fmt.Println(line[length-1])
+				}
 
-						log.Trace().Msg("Matching pattern: " + name + " for message: " + message)
+				url := "http://influxproxy:8007/api/v1/push/influx/write"
+				for _, line := range output {
+					fmt.Println(line)
+					body := strings.NewReader(line)
+					req, err := http.NewRequest("POST", url, body)
+					if err != nil {
+						log.Error().Msg("Error creating request: " + err.Error())
+						continue
+					}
+					req.Header.Set("Content-Type", "application/json")
 
-						matches := reg.FindAllStringSubmatch(message, -1)
-						if matches == nil {
-							continue // No matches for this pattern
-						}
-						var metricName string
+					resp, err := http.DefaultClient.Do(req)
+					if err != nil {
+						log.Error().Msg("Error sending request: " + err.Error())
+						continue
+					}
 
-						for _, match := range matches {
-							// Extract values based on named groups
+					//log.Debug().Msg("Sent message to InfluxProxy: " + line)
+					defer resp.Body.Close()
+				}
 
-							suffix := ""
+			} else {
 
-							for i, field := range pattern.fields {
-								if field == "n" {
-									suffix = "_" + match[i+1]
-								}
+				mac := logParts["hostname"].(string)
+				if mac == "" { // Skip empty mac addresses
+					continue
+				} else {
+					mutex.Lock()
+					loadedPart := syslogMetrics[mac]
+
+					if loadedPart == nil {
+						loadedPart = make(map[string]map[string]string) // if found but empty, create a new map, at start it will be empty everytime
+					}
+
+					if loadedPart["ip"] == nil {
+						loadedPart["ip"] = make(map[string]string)
+					}
+
+					if loadedPart["timestamp"] == nil {
+						loadedPart["timestamp"] = make(map[string]string)
+					}
+
+					loadedPart["ip"]["value"] = logParts["client"].(string)
+					loadedPart["timestamp"]["value"] = time.Now().Format(time.RFC3339Nano)
+
+					log.Trace().Msg("Received message from: " + mac)
+
+					message := logParts["message"].(string)
+
+					var splittedMessage []string
+
+					if strings.Contains(message, "\n") {
+						splittedMessage = strings.Split(logParts["message"].(string), "\n")
+					} else {
+						splittedMessage = []string{logParts["message"].(string)}
+					}
+
+					for _, message := range splittedMessage {
+						for name, pattern := range regexpPatterns {
+
+							reg, err := regexp.Compile(pattern.pattern)
+							if err != nil {
+								log.Error().Msg("Error compiling regexp: " + err.Error())
+								continue
 							}
 
-							for i, field := range pattern.fields {
-								if field == "name" {
-									metricName = match[i+1] + suffix
-								} else if match[i+1] != "" && field != "timestamp" { // todo - check if timestamp is needed
-									if loadedPart[metricName] == nil {
-										loadedPart[metricName] = make(map[string]string)
+							log.Trace().Msg("Matching pattern: " + name + " for message: " + message)
+
+							matches := reg.FindAllStringSubmatch(message, -1)
+							if matches == nil {
+								continue // No matches for this pattern
+							}
+							var metricName string
+
+							for _, match := range matches {
+								// Extract values based on named groups
+
+								suffix := ""
+
+								for i, field := range pattern.fields {
+									if field == "n" {
+										suffix = "_" + match[i+1]
 									}
-									loadedPart[metricName][field] = match[i+1]
+								}
+
+								for i, field := range pattern.fields {
+									if field == "name" {
+										metricName = match[i+1] + suffix
+									} else if match[i+1] != "" && field != "timestamp" { // todo - check if timestamp is needed
+										if loadedPart[metricName] == nil {
+											loadedPart[metricName] = make(map[string]string)
+										}
+										loadedPart[metricName][field] = match[i+1]
+									}
 								}
 							}
 						}
 					}
+
+					syslogMetrics[mac] = loadedPart
+
+					mutex.Unlock()
 				}
-
-				syslogMetrics[mac] = loadedPart
-
-				mutex.Unlock()
 			}
 		}
 	}(channel)

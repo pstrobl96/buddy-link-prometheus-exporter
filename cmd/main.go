@@ -59,7 +59,7 @@ func Run() {
 		log.Info().Msg("Syslog metrics enabled!")
 		log.Info().Msg("Syslog metrics server starting at: " + config.Exporter.Syslog.Metrics.ListenAddress)
 		go syslog.HandleMetrics(config.Exporter.Syslog.Metrics.ListenAddress)
-		collectors = append(collectors, syslog.NewCollector(*syslogTTL))
+		collectors = append(collectors, syslog.NewCollector(*syslogTTL, config.Exporter.RemoteWrite.Format, config.Exporter.RemoteWrite.Endpoint))
 	}
 
 	if config.Exporter.Syslog.Logs.Enabled {

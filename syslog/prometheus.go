@@ -132,12 +132,14 @@ type Collector struct {
 // It initializes all the Prometheus metrics used for monitoring different aspects of the printer.
 // The defaultLabels parameter is a list of labels that will be included in all the metrics.
 // Returns a pointer to the created Collector.
-func NewCollector(syslogTTL int) *Collector {
+func NewCollector(syslogTTL int, format string, endpoint string) *Collector {
 	defaultLabels := []string{"mac", "ip"}
 	if syslogTTL < 1 {
 		log.Panic("syslog TTL must be greater than 0")
 	}
 	ttl = syslogTTL
+	remoteWriteFormat = format
+	remoteWriteEndpoint = endpoint
 	return &Collector{
 		printerActiveExtruder:        prometheus.NewDesc("prusa_active_extruder", "Active extruder - used for XL", defaultLabels, nil),
 		printerAppStart:              prometheus.NewDesc("prusa_app_start", "Application start", defaultLabels, nil),

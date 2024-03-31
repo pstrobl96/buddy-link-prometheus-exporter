@@ -1,20 +1,95 @@
 version: "3"
 
-volumes:
-  prusa_syslog:
-
 networks:
   prusa:
 
+volumes:
+  mimir_data:
+  grafana_data:
+  prusa_syslog_logs:
+
 services:
+  influxproxy:
+    build: 
+      context: https://github.com/grafana/influx2cortex.git#main
+      network: host
+      dockerfile_inline: |
+        FROM golang:1.21.8-alpine as build
+        RUN apk add --update --no-cache git coreutils
+        WORKDIR /go/src/github.com/grafana/influx2cortex
+        COPY . .
+        RUN go mod download
+        RUN go build -o /bin/influx2cortex ./cmd/influx2cortex
+        FROM alpine:3.12
+        RUN apk add --update --no-cache ca-certificates
+        RUN addgroup -g 1000 app && \
+          adduser -u 1000 -h /app -G app -S app
+        WORKDIR /app
+        USER app
+        COPY --from=build /bin/influx2cortex /bin/influx2cortex
+        ENTRYPOINT [ "/bin/influx2cortex" ]
+    container_name: influxproxy
+    entrypoint: 
+    - "/bin/influx2cortex"
+    - "-auth.enable=false"
+    - "-server.http-listen-port=8007"
+    - "-write-endpoint=http://mimir:9009/api/v1/push"
+    pull_policy: build
+    restart: unless-stopped
+    networks:
+      - prusa
+
+  loki:
+    image: grafana/loki:2.9.6
+    container_name: loki
+    restart: unless-stopped
+    volumes:
+      - ./docs/examples/config/on_premise/loki.yaml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - prusa
+
+  mimir:
+    image: grafana/mimir:2.11.0
+    container_name: mimir
+    restart: unless-stopped
+    volumes:
+      - ./docs/examples/config/on_premise/mimir.yaml:/etc/mimir-config/mimir.yaml
+      - mimir_data:/data
+    ports:
+      - "9009:9009"
+    entrypoint:
+      - /bin/mimir
+      - -config.file=/etc/mimir-config/mimir.yaml
+    networks:
+      - prusa
+
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      - GF_INSTALL_PLUGINS=grafana-xyzchart-panel, grafana-polystat-panel
+    depends_on:
+      - loki
+      - mimir
+    ports:
+      - "3000:3000"
+    networks:
+      - prusa
+    volumes:
+      - ./docs/examples/config/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+      - ./docs/examples/grafana/provisioning:/var/lib/grafana/dashboards
+
   exporter:
     build: .
     container_name: exporter
     restart: unless-stopped
     volumes:
-      - prusa_syslog:/var/log/prusa
+      - prusa_syslog_logs:/var/log/prusa
       - type: bind
-        source: ./prusa.yml
+        source: ./docs/examples/config/common/prusa.yml
         target: /app/prusa.yml
     ports:
       - "10007:10007/udp"
@@ -23,27 +98,24 @@ services:
     command: '--config.file=/app/prusa.yml'
     networks:
       - prusa
-      
+
   agent:
     image: grafana/agent:v0.40.3
-    container_name: grafana_agent
+    container_name: agent
+    depends_on:
+      - exporter
+      - mimir
     restart: unless-stopped
     volumes:  
       - /var/run/docker.sock:/var/run/docker.sock
-      - prusa_syslog:/var/log/prusa
+      - prusa_syslog_logs:/var/log/prusa
       - type: bind
-        source: ./agent.yaml
+        source: ./docs/examples/config/on_premise/agent.yaml
         target: /etc/agent-config/agent.yaml
     entrypoint:
       - /bin/grafana-agent
       - -server.http.address=0.0.0.0:12345
       - -config.file=/etc/agent-config/agent.yaml
       - -metrics.wal-directory=/tmp/agent/wal
-    ports:
-      - "12345:12345"
-      - "3500:3500"
     networks:
       - prusa
-    depends_on:
-      - exporter
-  
