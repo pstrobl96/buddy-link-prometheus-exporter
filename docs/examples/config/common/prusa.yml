@@ -3,7 +3,7 @@ exporter:
   log_level: info
   remote_write:
     enabled: true
-    format: influx # can be also influx
+    format: PENIS # can be also influx
     endpoint: http://influxproxy:8007/api/v1/push/influx/write
     #endpoint: http://mimir:9009/api/v1/push
   prusalink:
@@ -13,7 +13,7 @@ exporter:
       enabled: true
       listen_address: 0.0.0.0:10008
     logs:
-      enabled: true
+      enabled: false
       listen_address: 0.0.0.0:10007
       directory: /var/log/prusa
       filename: exporter.log

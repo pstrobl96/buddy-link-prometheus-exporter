@@ -138,7 +138,11 @@ func NewCollector(syslogTTL int, format string, endpoint string) *Collector {
 		log.Panic("syslog TTL must be greater than 0")
 	}
 	ttl = syslogTTL
-	remoteWriteFormat = format
+	if format == "influx" {
+		remoteWriteInflux = true
+	} else {
+		remoteWriteInflux = false
+	}
 	remoteWriteEndpoint = endpoint
 	return &Collector{
 		printerActiveExtruder:        prometheus.NewDesc("prusa_active_extruder", "Active extruder - used for XL", defaultLabels, nil),

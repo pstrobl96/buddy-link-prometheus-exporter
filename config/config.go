@@ -14,8 +14,8 @@ type Config struct {
 		LogLevel      string `yaml:"log_level"`
 		RemoteWrite   struct {
 			Enabled  bool   `yaml:"enabled"`
-			Endpoint string `yaml:"endpoint"`
 			Format   string `yaml:"format"`
+			Endpoint string `yaml:"endpoint"`
 		} `yaml:"remote_write"`
 		Prusalink struct {
 			Enabled bool `yaml:"enabled"`
@@ -31,8 +31,8 @@ type Config struct {
 				Directory     string `yaml:"directory"`
 				Filename      string `yaml:"filename"`
 				MaxSize       int    `yaml:"max_size"`
-				MaxBackups    int    `yaml:"max_backups"`
 				MaxAge        int    `yaml:"max_age"`
+				MaxBackups    int    `yaml:"max_backups"`
 			} `yaml:"logs"`
 		} `yaml:"syslog"`
 	} `yaml:"exporter"`

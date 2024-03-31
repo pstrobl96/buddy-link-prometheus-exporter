@@ -87,44 +87,45 @@ func HandleMetrics(listenUDP string) {
 		for logParts := range channel {
 			var timestamp time.Time
 			var output []string
-			if remoteWriteFormat == "influx" {
-				output = []string{}
-				timestamp = time.Now().UTC()
-				timestampUnix := timestamp.UnixNano()
-				mac := logParts["hostname"].(string)
-				if mac == "" {
-					continue
-				}
-				ip := logParts["client"].(string)
-				facility := logParts["facility"].(int)
-				severity := logParts["severity"].(int)
-				appName := logParts["app_name"].(string)
-				if appName == "" {
-					appName = "unknown"
-				}
-				procID := logParts["proc_id"].(string)
-				if procID == "" {
-					procID = "unknown"
-				}
-				msgID := logParts["msg_id"].(string)
-				if msgID == "" {
-					msgID = "unknown"
-				}
-				message := logParts["message"].(string)
-				if message == "" {
-					message = "unknown"
-				}
-				priority := logParts["priority"].(int)
-				structuredData := logParts["structured_data"].(string)
-				if structuredData == "" {
-					structuredData = "unknown"
-				}
-				version := logParts["version"].(int)
-				tlsPeer := logParts["tls_peer"].(string)
-				if tlsPeer == "" {
-					tlsPeer = "unknown"
-				}
+			timestamp = time.Now().UTC()
+			timestampUnix := timestamp.UnixNano()
+			mac := logParts["hostname"].(string)
+			if mac == "" {
+				continue
+			}
+			ip := logParts["client"].(string)
+			facility := logParts["facility"].(int)
+			severity := logParts["severity"].(int)
+			appName := logParts["app_name"].(string)
+			if appName == "" {
+				appName = "unknown"
+			}
+			procID := logParts["proc_id"].(string)
+			if procID == "" {
+				procID = "unknown"
+			}
+			msgID := logParts["msg_id"].(string)
+			if msgID == "" {
+				msgID = "unknown"
+			}
+			message := logParts["message"].(string)
+			if message == "" {
+				message = "unknown"
+			}
+			priority := logParts["priority"].(int)
+			structuredData := logParts["structured_data"].(string)
+			if structuredData == "" {
+				structuredData = "unknown"
+			}
+			version := logParts["version"].(int)
+			tlsPeer := logParts["tls_peer"].(string)
+			if tlsPeer == "" {
+				tlsPeer = "unknown"
+			}
 
+			if remoteWriteInflux {
+				output = []string{}
+				log.Info().Msg("Received message from: " + mac)
 				var splittedMessage []string
 				if strings.Contains(message, "\n") {
 					splittedMessage = strings.Split(logParts["message"].(string), "\n")
@@ -169,6 +170,44 @@ func HandleMetrics(listenUDP string) {
 
 					//log.Debug().Msg("Sent message to InfluxProxy: " + line)
 					defer resp.Body.Close()
+				}
+
+			} else if !remoteWriteInflux {
+				fmt.Println("EFEF")
+				var splittedMessage []string
+				if strings.Contains(message, "\n") {
+					splittedMessage = strings.Split(logParts["message"].(string), "\n")
+				} else {
+					splittedMessage = []string{logParts["message"].(string)}
+				}
+
+				for _, message := range splittedMessage {
+					line := strings.Split(message, " ")
+					length := len(line)
+					pos := 0
+					if strings.Contains(line[pos], "msg") { // getting rid of msg metrics
+						line[0] = ""
+						pos = 1
+					}
+
+					line[pos] = strings.Join([]string{"prusa_" + line[0], "ip=" + ip, "facility=" + strconv.Itoa(facility), "severity=" + strconv.Itoa(severity),
+						"app_name=" + appName, "proc_id=" + procID, "msg_id=" + msgID, "priority=" + strconv.Itoa(priority), "structured_data=" + structuredData,
+						"version=" + strconv.Itoa(version), "tls_peer=" + tlsPeer, "mac=" + mac}, ",")
+					time, _ := strconv.ParseInt(line[length-1], 10, 64)
+					line[length-1] = strconv.FormatInt(timestampUnix-(time*1000), 10)
+					output = append(output, strings.Join(line, " "))
+
+					metric, err := parseInfluxLine(strings.Join(line, " "))
+					if err != nil {
+						fmt.Println("Error parsing line:", err)
+						continue
+					}
+
+					fmt.Println("Measurement:", metric.Measurement)
+					fmt.Println("Tags:", metric.Tags)
+					fmt.Println("Fields:", metric.Fields)
+					fmt.Println("Timestamp:", metric.Timestamp)
+
 				}
 
 			} else {
@@ -258,4 +297,63 @@ func HandleMetrics(listenUDP string) {
 	}(channel)
 
 	server.Wait()
+}
+
+// Metric represents a single data point
+type Metric struct {
+	Measurement string
+	Tags        map[string]string
+	Fields      map[string]float64 // Assuming numerical fields
+	Timestamp   int64              // Optional timestamp (unix epoch in milliseconds)
+}
+
+func parseInfluxLine(line string) (*Metric, error) {
+	parts := strings.Split(line, ",")
+	if len(parts) < 3 {
+		return nil, fmt.Errorf("invalid line format: %s", line)
+	}
+
+	metric := &Metric{
+		Tags:   make(map[string]string),
+		Fields: make(map[string]float64),
+	}
+
+	// Parse measurement
+	metric.Measurement = parts[0]
+
+	// Parse tags
+	for _, tag := range parts[1 : len(parts)-1] {
+		keyVal := strings.Split(tag, "=")
+		if len(keyVal) != 2 {
+			return nil, fmt.Errorf("invalid tag format: %s", tag)
+		}
+		metric.Tags[keyVal[0]] = keyVal[1]
+	}
+
+	// Parse fields
+	fieldPart := parts[len(parts)-1]
+	fieldPairs := strings.Split(fieldPart, " ")
+	for _, fieldPair := range fieldPairs {
+		keyVal := strings.Split(fieldPair, "=")
+		if len(keyVal) != 2 {
+			return nil, fmt.Errorf("invalid field format: %s", fieldPair)
+		}
+		value, err := strconv.ParseFloat(keyVal[1], 64) // Assuming numerical fields
+		if err != nil {
+			return nil, fmt.Errorf("invalid field value: %s", keyVal[1])
+		}
+		metric.Fields[keyVal[0]] = value
+	}
+
+	// Parse timestamp (optional)
+	if strings.Contains(fieldPart, " ") {
+		timestampStr := strings.TrimPrefix(fieldPart, strings.Split(fieldPart, " ")[0]+" ")
+		timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid timestamp format: %s", timestampStr)
+		}
+		metric.Timestamp = timestamp
+	}
+
+	return metric, nil
 }

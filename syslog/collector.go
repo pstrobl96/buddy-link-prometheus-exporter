@@ -12,7 +12,7 @@ import (
 
 var (
 	ttl                 = 60
-	remoteWriteFormat   string
+	remoteWriteInflux   bool
 	remoteWriteEndpoint string
 )
 
