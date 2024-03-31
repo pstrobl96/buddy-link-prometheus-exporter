@@ -1,6 +1,7 @@
 package syslog
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -9,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/castai/promwrite"
+	"github.com/influxdata/influxdb/models"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/mcuadros/go-syslog.v2"
 )
@@ -173,7 +176,6 @@ func HandleMetrics(listenUDP string) {
 				}
 
 			} else if !remoteWriteInflux {
-				fmt.Println("EFEF")
 				var splittedMessage []string
 				if strings.Contains(message, "\n") {
 					splittedMessage = strings.Split(logParts["message"].(string), "\n")
@@ -190,23 +192,53 @@ func HandleMetrics(listenUDP string) {
 						pos = 1
 					}
 
-					line[pos] = strings.Join([]string{"prusa_" + line[0], "ip=" + ip, "facility=" + strconv.Itoa(facility), "severity=" + strconv.Itoa(severity),
-						"app_name=" + appName, "proc_id=" + procID, "msg_id=" + msgID, "priority=" + strconv.Itoa(priority), "structured_data=" + structuredData,
-						"version=" + strconv.Itoa(version), "tls_peer=" + tlsPeer, "mac=" + mac}, ",")
-					time, _ := strconv.ParseInt(line[length-1], 10, 64)
-					line[length-1] = strconv.FormatInt(timestampUnix-(time*1000), 10)
-					output = append(output, strings.Join(line, " "))
+					line[pos] = "prusa_" + line[pos]
+					timestamp, _ := strconv.ParseInt(line[length-1], 10, 64)
+					line[length-1] = strconv.FormatInt(timestampUnix-(timestamp*1000), 10)
+					//fmt.Println(strings.Join(line, " "))
+					points, _ := models.ParsePointsString(strings.Join(line, " "))
 
-					metric, err := parseInfluxLine(strings.Join(line, " "))
+					fmt.Printf("tags: %v\n", points[0].Tags())
+					client := promwrite.NewClient("http://mimir:9009/api/v1/write")
+
+					fields, err := points[0].Fields()
+
 					if err != nil {
-						fmt.Println("Error parsing line:", err)
+						fmt.Println("Error getting fields:", err)
 						continue
 					}
+					for k, v := range fields {
+						labels := []promwrite.Label{
+							{
+								Name:  "__name__",
+								Value: "prusa_" + string(points[0].Name()) + "_" + k,
+							},
+						}
 
-					fmt.Println("Measurement:", metric.Measurement)
-					fmt.Println("Tags:", metric.Tags)
-					fmt.Println("Fields:", metric.Fields)
-					fmt.Println("Timestamp:", metric.Timestamp)
+						for _, v := range points[0].Tags() {
+							labels = append(labels, promwrite.Label{
+								Name:  string(v.Key),
+								Value: string(v.Value),
+							})
+						}
+
+						_, err := client.Write(context.Background(), &promwrite.WriteRequest{
+							TimeSeries: []promwrite.TimeSeries{
+								{
+									Labels: labels,
+									Sample: promwrite.Sample{
+										Time:  time.Unix(timestampUnix-(timestamp*1000), 0),
+										Value: 123,
+									},
+								},
+							},
+						})
+						if err != nil {
+							fmt.Println("Error writing points:", err)
+							continue
+						}
+						fmt.Println(k, v)
+					}
 
 				}
 
