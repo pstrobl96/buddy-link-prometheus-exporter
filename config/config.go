@@ -12,7 +12,11 @@ type Config struct {
 	Exporter struct {
 		ScrapeTimeout int    `yaml:"scrape_timeout"`
 		LogLevel      string `yaml:"log_level"`
-		Prusalink     struct {
+		RemoteWrite   struct {
+			Enabled  bool   `yaml:"enabled"`
+			Endpoint string `yaml:"endpoint"`
+		} `yaml:"remote_write"`
+		Prusalink struct {
 			Enabled bool `yaml:"enabled"`
 		} `yaml:"prusalink"`
 		Syslog struct {

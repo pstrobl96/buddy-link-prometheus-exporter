@@ -1,6 +1,9 @@
 exporter:
   scrape_timeout: 1000 # scrape timeout of Prusa Link in ms
   log_level: info
+  remote_write:
+    enabled: true
+    endpoint: http://mimir:9009/api/v1/push
   prusalink:
     enabled: true
   syslog:
