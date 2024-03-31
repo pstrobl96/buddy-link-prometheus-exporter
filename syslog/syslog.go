@@ -81,14 +81,13 @@ func startSyslogServer(listenUDP string) (syslog.LogPartsChannel, *syslog.Server
 
 // HandleMetrics is function that listens for syslog messages and parses them into map
 func HandleMetrics(listenUDP string) {
-	debug := true
 	channel, server := startSyslogServer(listenUDP)
 	log.Debug().Msg("Syslog server started at: " + listenUDP)
 	go func(channel syslog.LogPartsChannel) {
 		for logParts := range channel {
 			var timestamp time.Time
 			var output []string
-			if debug {
+			if remoteWriteFormat == "influx" {
 				output = []string{}
 				timestamp = time.Now().UTC()
 				timestampUnix := timestamp.UnixNano()
