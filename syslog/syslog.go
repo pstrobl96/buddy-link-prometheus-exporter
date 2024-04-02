@@ -208,6 +208,8 @@ func HandleMetrics(listenUDP string) {
 						continue
 					}
 					for k, v := range fields {
+						value := 0.0
+
 						labels := []promwrite.Label{
 							{
 								Name:  "__name__",
@@ -216,10 +218,14 @@ func HandleMetrics(listenUDP string) {
 						}
 
 						for _, v := range points[0].Tags() {
-							labels = append(labels, promwrite.Label{
-								Name:  string(v.Key),
-								Value: string(v.Value),
-							})
+							if v.Key != "v" {
+								labels = append(labels, promwrite.Label{
+									Name:  string(v.Key),
+									Value: string(v.Value),
+								})
+							} else {
+								value, _ = strconv.ParseFloat(string(v.Value), 64)
+							}
 						}
 
 						_, err := client.Write(context.Background(), &promwrite.WriteRequest{
@@ -228,7 +234,7 @@ func HandleMetrics(listenUDP string) {
 									Labels: labels,
 									Sample: promwrite.Sample{
 										Time:  time.Unix(timestampUnix-(timestamp), 0),
-										Value: 123,
+										Value: value,
 									},
 								},
 							},
@@ -331,61 +337,3 @@ func HandleMetrics(listenUDP string) {
 	server.Wait()
 }
 
-// Metric represents a single data point
-type Metric struct {
-	Measurement string
-	Tags        map[string]string
-	Fields      map[string]float64 // Assuming numerical fields
-	Timestamp   int64              // Optional timestamp (unix epoch in milliseconds)
-}
-
-func parseInfluxLine(line string) (*Metric, error) {
-	parts := strings.Split(line, ",")
-	if len(parts) < 3 {
-		return nil, fmt.Errorf("invalid line format: %s", line)
-	}
-
-	metric := &Metric{
-		Tags:   make(map[string]string),
-		Fields: make(map[string]float64),
-	}
-
-	// Parse measurement
-	metric.Measurement = parts[0]
-
-	// Parse tags
-	for _, tag := range parts[1 : len(parts)-1] {
-		keyVal := strings.Split(tag, "=")
-		if len(keyVal) != 2 {
-			return nil, fmt.Errorf("invalid tag format: %s", tag)
-		}
-		metric.Tags[keyVal[0]] = keyVal[1]
-	}
-
-	// Parse fields
-	fieldPart := parts[len(parts)-1]
-	fieldPairs := strings.Split(fieldPart, " ")
-	for _, fieldPair := range fieldPairs {
-		keyVal := strings.Split(fieldPair, "=")
-		if len(keyVal) != 2 {
-			return nil, fmt.Errorf("invalid field format: %s", fieldPair)
-		}
-		value, err := strconv.ParseFloat(keyVal[1], 64) // Assuming numerical fields
-		if err != nil {
-			return nil, fmt.Errorf("invalid field value: %s", keyVal[1])
-		}
-		metric.Fields[keyVal[0]] = value
-	}
-
-	// Parse timestamp (optional)
-	if strings.Contains(fieldPart, " ") {
-		timestampStr := strings.TrimPrefix(fieldPart, strings.Split(fieldPart, " ")[0]+" ")
-		timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid timestamp format: %s", timestampStr)
-		}
-		metric.Timestamp = timestamp
-	}
-
-	return metric, nil
-}
