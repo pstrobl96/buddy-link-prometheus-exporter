@@ -7,7 +7,7 @@ exporter:
     #endpoint: http://influxproxy:8007/api/v1/push/influx/write
     endpoint: http://mimir:9009/api/v1/push
   prusalink:
-    enabled: true
+    enabled: false
   syslog:
     metrics:
       enabled: true
@@ -20,11 +20,3 @@ exporter:
       max_size: 10 # in MB
       max_age: 7 # in days
       max_backups: 10
-printers:
-  - address: <address_of_printer>
-    username: maker
-    password: <password>
-    name: <your_printer_name> # optional
-  - address: <address_of_printer>
-    apikey: <apikey>
-    name: <your_printer_name> # optional
