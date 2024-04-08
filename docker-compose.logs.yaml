@@ -19,7 +19,7 @@ services:
       - prusa
 
   exporter:
-    image: pubeldev/prusa_exporter:v1.0.rc1
+    image: pubeldev/prusa_exporter:v1.0.rc2
     container_name: exporter
     restart: unless-stopped
     volumes:
@@ -29,8 +29,6 @@ services:
         target: /app/prusa.yml
     ports:
       - "10007:10007/udp"
-      - "10008:10008/udp"
-      - "10009:10009"
     command: '--config.file=/app/prusa.yml'
     networks:
       - prusa

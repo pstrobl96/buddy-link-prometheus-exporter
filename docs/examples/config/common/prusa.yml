@@ -6,7 +6,6 @@ exporter:
   syslog:
     metrics:
       enabled: false
-      listen_address: 0.0.0.0:10008
     logs:
       enabled: true
       listen_address: 0.0.0.0:10007
@@ -15,11 +14,3 @@ exporter:
       max_size: 10 # in MB
       max_age: 7 # in days
       max_backups: 10
-printers:
-  - address: <address_of_printer>
-    username: maker
-    password: <password>
-    name: <your_printer_name> # optional
-  - address: <address_of_printer>
-    apikey: <apikey>
-    name: <your_printer_name> # optional
