@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/pstrobl96/prusa_exporter/prusalink"
 	"github.com/rs/zerolog/log"
 )
 
@@ -44,7 +43,6 @@ func (collector *Collector) Collect(ch chan<- prometheus.Metric) {
 		if !timeParsed.Before(timeNowWithoutTTL) {
 			alive = true
 		}
-		ch <- prometheus.MustNewConstMetric(collector.printerSyslogUp, prometheus.GaugeValue, prusalink.BoolToFloat(alive), getLabels(mac, ip, []string{})...)
 
 		if alive {
 			for k, v := range v {
