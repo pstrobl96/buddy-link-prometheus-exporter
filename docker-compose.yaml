@@ -24,7 +24,7 @@ services:
       - ./docs/examples/grafana/provisioning:/var/lib/grafana/dashboards
 
   exporter:
-    build: .
+    image: prusa_exporter:latest
     container_name: exporter
     restart: unless-stopped
     volumes:
@@ -39,9 +39,7 @@ services:
       - prusa
 
   prusa_metrics_handler:
-    build: 
-      context: /home/pubel/Documents/github/prusa_metrics_handler # better safe than sorry
-      network: host
+    image: prusa_metrics_handler:latest
     container_name: prusa_metrics_handler
     restart: unless-stopped
     command: 
