@@ -1,28 +1,11 @@
-version: "3"
-
 networks:
   prusa:
 
 volumes:
-  prometheus_data:
   grafana_data:
+  prometheus_data:
 
 services:
-  prometheus:
-    image: prom/prometheus:v3.1.0
-    container_name: prometheus
-    volumes:
-      - ./prometheus/:/etc/prometheus/
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-    ports:
-      - 9090:9090
-    networks:
-      - prusa
-    restart: always
-
   grafana:
     image: grafana/grafana:11.4.0
     container_name: grafana
@@ -45,20 +28,20 @@ services:
     container_name: exporter
     restart: unless-stopped
     volumes:
-      - prusa_syslog_logs:/var/log/prusa
       - type: bind
-        source: ./docs/examples/config/common/prusa.yml
+        source: ./prusa.yml
         target: /app/prusa.yml
     ports:
       - "10009:10009"
     command: 
       - "--config.file=/app/prusa.yml"
-      - "--prusalink.scrape-interval=20"
     networks:
       - prusa
 
   prusa_metrics_handler:
-    image: pubeldev/prusa_metrics_handler:0.1.1
+    build: 
+      context: /home/pubel/Documents/github/prusa_metrics_handler # better safe than sorry
+      network: host
     container_name: prusa_metrics_handler
     restart: unless-stopped
     command: 
@@ -76,7 +59,7 @@ services:
 
   influxproxy:
     build: 
-      context: https://github.com/grafana/influx2cortex.git#9be4cafaefe490d61ec2d1e203631741fdf5c59d # better safe than sorry
+      context: https://github.com/grafana/influx2cortex.git#main # better safe than sorry
       network: host
       dockerfile_inline: |
         FROM golang:1.23-alpine as build
@@ -103,5 +86,19 @@ services:
     restart: unless-stopped
     depends_on:
       - prometheus
+    networks:
+      - prusa
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: prometheus
+    restart: always
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-remote-write-receiver'
+    volumes:
+      - ./docs/config/prometheus.yaml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
     networks:
       - prusa
